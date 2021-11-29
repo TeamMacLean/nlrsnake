@@ -41,10 +41,11 @@ that folder.
 The file `config.yaml` contains job info and needs to be filled in. The pipeline looks for it automatically.
 It is brief
 
-> ipro_tmp: "/tsl/scratch/user_name/ipro_temp/"
-> input_fasta: "/hpc-home/user_name/proteins.faa"
-> seqs_per_file: 6000
-
+```
+ ipro_tmp: "/tsl/scratch/user_name/ipro_temp/"
+ input_fasta: "/hpc-home/user_name/proteins.faa"
+ seqs_per_file: 6000
+```
     * `ipro_tmp` is the path of a temporary working directory for `interproscan`
     * `input_fasta` is the name of the input sequences file
     * `seqs_per_file` is the number of sequences per chunk for `interproscan` 6000 is a good number
