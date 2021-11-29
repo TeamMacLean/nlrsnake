@@ -1,0 +1,3 @@
+ipro_tmp: "/tsl/scratch/macleand/ipro_temp/"
+input_fasta: "/hpc-home/macleand/Zm-B73-REFERENCE-NAM-5.0_Zm00001eb.1.protein.fa.noasterix"
+seqs_per_file: 6000

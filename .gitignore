@@ -1,0 +1,9 @@
+.snakemake/
+nlrtrack.log
+results/
+nlrtracker_out/
+ipro_fa/
+ipro_gff/
+**/.DS_Store
+**/*.out
+.idea/
