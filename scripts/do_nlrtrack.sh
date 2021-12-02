@@ -14,13 +14,14 @@ usage: $(basename "$0") [OPTION]...
 
 Requires a file 'config.yaml' with three entries, e.g
 
-ipro_tmp: "/tsl/scratch/macleand/ipro_temp/"
-input_fasta: "my_seqs.fa"
-seqs_per_file: 6000
+ scratch: "/tsl/scratch/user_name/nlrsnake/"
+ sample_fasta_file: "/hpc-home/user_name/samples_to_fasta.csv"
+ seqs_per_file: 6000
 
-ipro_temp - a temporary directory, ideally somewhere in scratch
-input_fasta - the sequences to use. Must be protein. Asterisks will be removed automatically.
-seq_per_file - number of sequences per sub-job in interproscan. 6000 is a good number.
+
+  * 'scratch' is the path of a temporary working directory for all steps of the pipeline. A subdirectory for each sample will be created.
+  * 'sample_fasta_file' is the name of a csv file linking input sequences to sample names
+  * 'seqs_per_file' is the number of sequences per chunk for `interproscan` 6000 is a good number
 
 EOM
   exit 2
@@ -30,7 +31,7 @@ if [ -z "$1" ]
 then
    sbatch -J nlrtrack \
     -o nlrtrack.log \
-    --wrap="source snakemake-5.5.3; snakemake -s scripts/nlrtrack.snakefile all --cluster 'sbatch --partition={params.queue} -c {threads} --mem={params.mem} --constraint="intel" ' -j 20 --latency-wait 60" \
+    --wrap="source snakemake-5.5.3; snakemake -s scripts/nlrtrack.snakefile all --cluster 'sbatch --partition={params.queue} -c {threads} --mem={params.mem} --constraint="intel" ' -j 40 --latency-wait 60" \
     --constraint="intel"
 elif [ $1 = 'unlock' ]
 then

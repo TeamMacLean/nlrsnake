@@ -11,13 +11,13 @@ useful for bioinformatics pipelines especially this one, where we want to divide
 
 ## The pipeline
 
-The pipeline takes a set of protein sequences then in parallel:
+The pipeline takes multiple sets of protein sequences then in parallel, for each set:
 
     1. Runs `interprocan.sh` 
     2. Runs `hmmer`
     3. Runs `fimo`    
     
-Once these are done, `NLRtracker.R` is run
+Once these are done, `NLRtracker.R` is run and a results folder for each sample created
 
     
 ### Interproscan step 
@@ -42,13 +42,23 @@ The file `config.yaml` contains job info and needs to be filled in. The pipeline
 It is brief
 
 ```
- ipro_tmp: "/tsl/scratch/user_name/ipro_temp/"
- input_fasta: "/hpc-home/user_name/proteins.faa"
+ scratch: "/tsl/scratch/user_name/nlrsnake/"
+ sample_fasta_file: "/hpc-home/user_name/samples_to_fasta.csv"
  seqs_per_file: 6000
 ```
-    * `ipro_tmp` is the path of a temporary working directory for `interproscan`
-    * `input_fasta` is the name of the input sequences file
+    * `scratch` is the path of a temporary working directory for all steps of the pipeline. A subdirectory for each sample will be created.
+    * `sample_fasta_file` is the name of a csv file linking input sequences to sample names
     * `seqs_per_file` is the number of sequences per chunk for `interproscan` 6000 is a good number
+    
+Try to use the absolute (full length) path in the `config.yaml` file
+
+### `sample_fasta_file`
+
+The format is `sample_name,path` , one per line. No blank lines at the end of the file. No spaces. Alphanumeric characters and underscores only. 
+
+```
+    sample_1,/hpc-home/user_name/seqs1.fa
+```
     
 ### The submission script
 
