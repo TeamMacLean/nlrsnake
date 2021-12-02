@@ -103,7 +103,7 @@ rule nlrtracker:
         mem="16G",
         queue="tsl-short",
     threads: 8
-    shell: "bash scripts/run_tracker.sh {params.ipro_list} {input.interpro} {input.fimo} {input.fa} {params.run_dir} p {input.hmmer} {params.itol}"
+    shell: "bash scripts/run_tracker.sh {params.ipro_list} {input.interpro} {input.fimo} {input.fa} {params.run_dir} {wildcards.sample} p {input.hmmer} {params.itol}"
         #"source nlrtracker-1.0.0; "
         #"Rscript scripts/NLRtracker.R {params.ipro_list} {input.interpro} {input.fimo} {input.fa} {output} p {input.hmmer} {params.itol};"
 
@@ -125,7 +125,7 @@ rule aggregate:
         "cat {input} > {output}"
 
 
-rule gather_all:
+rule gather_dones:
     input: expand("{sample}/nlrtracker_out/done.txt", sample=SAMPLES)
     output: "done.txt"
     params:
