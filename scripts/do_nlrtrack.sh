@@ -31,14 +31,12 @@ if [ -z "$1" ]
 then
    sbatch -J nlrtrack \
     -o nlrtrack.log \
-    --wrap="source snakemake-5.5.3; snakemake -s scripts/nlrtrack.snakefile all --cluster 'sbatch --partition={params.queue} -c {threads} --mem={params.mem} --constraint="intel" ' -j 40 --max-jobs-per-second 5 --max-status-checks-per-second 5 --latency-wait 60" \
-    --constraint="intel"
+    --wrap="source snakemake-5.5.3; snakemake -s scripts/nlrtrack.snakefile all --cluster 'sbatch --partition={params.queue} -c {threads} --mem={params.mem} ' -j 40 --max-jobs-per-second 5 --max-status-checks-per-second 5 --latency-wait 60"
 elif [ $1 = 'unlock' ]
 then
     sbatch -J unlock \
         -o nlrtrack.log \
         --wrap="source snakemake-5.5.3; snakemake -s scripts/nlrtrack.snakefile --unlock" \
-        --constraint="intel" \
         --partition="tsl-short" \
         --mem="16G"
 elif [ $1 = "dryrun" ]
@@ -46,7 +44,6 @@ then
     sbatch -J dryrun \
     -o nlrtrack.log \
     --wrap="source snakemake-5.5.3; snakemake -s scripts/nlrtrack.snakefile -n" \
-    --constraint="intel" \
     --partition="tsl-short" \
     --mem="16G"
 elif [ $1 = "dag" ]
@@ -54,7 +51,6 @@ then
     sbatch -J dag \
     -o nlrtrack.log \
     --wrap="source snakemake-5.5.3; snakemake --dag -s scripts/nlrtrack.snakefile  > nlrtrack.dot" \
-    --constraint="intel" \
     --partition="tsl-short" \
     --mem="16G"
 elif [ $1 = '-h' ]
