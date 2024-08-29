@@ -98,7 +98,7 @@ rule nlrtracker:
     output: "{sample}/nlrtracker_out/done.txt"
     params:
         itol="lib/iTOL_NLR_template.txt",
-        ipro_list="lib/interproscan_5.51-85.0.list",
+        ipro_list="lib/interproscan_v5.69-101.0_entry.list",
         run_dir="{sample}/nlrtracker_out",
         mem="16G",
         queue="tsl-short",
