@@ -12,7 +12,7 @@ threads=$(($3 - 2))
 out=$4
 
 
-singularity exec --bind :$dir /tsl/software/testing/interproscan/5.68.100/x86_64/bin/interproscan_5.69-101.0.simg interproscan.sh -i $fasta \
+singularity exec --bind :$dir /tsl/software/testing/interproscan/5.69.101/x86_64/bin/interproscan_5.69-101.0.simg interproscan.sh -i $fasta \
   -f gff3 \
   -T $tmpdir \
   -cpu $threads \
