@@ -17,5 +17,4 @@ singularity exec --bind :$dir /tsl/software/testing/interproscan/5.69.101/x86_64
   -T $tmpdir \
   -cpu $threads \
   -o $out \
-  -appl Pfam,Gene3D,SUPERFAMILY,PRINTS,SMART,CDD,ProSiteProfiles \
-  -dp
+  -appl Pfam,Gene3D,SUPERFAMILY,PRINTS,SMART,CDD,ProSiteProfiles
