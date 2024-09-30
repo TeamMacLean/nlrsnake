@@ -9,6 +9,29 @@ annotate = config['annotate'].split(",")
 annotate_sample = annotate[0]
 annotate_path = annotate[1]
 
+# Define the lineage options
+lineage_options = ['vertebrate', 'land_plant', 'fungi', 'invertebrate']
+
+# Create a dictionary to map lineages to their corresponding models
+lineage_models = {
+    'vertebrate': "/tsl/data/helixer/models/vertebrate/vertebrate_v0.3_m_0080.h5",
+    'land_plant': "/tsl/data/helixer/models/land_plant/land_plant_v0.3_a_0080.h5",
+    'fungi': "/tsl/data/helixer/models/fungi/fungi_v0.3_a_0100.h5",
+    'invertebrate': "/tsl/data/helixer/models/invertebrate/invertebrate_v0.3_m_0100.h5"
+}
+
+# Default values if user doesn't specify a lineage
+model = lineage_models['land_plant']
+lineage_op = 'land_plant'
+
+# Check if any lineage option is in the config
+for lin in lineage_options:
+    if lin in config['helixer_options']:
+        model = lineage_models[lin]
+        lineage_op = lin
+        break  # Exit the loop once a match is found
+		
+
 # Define the final output
 FINAL_OUTPUT = "done.txt"
 
@@ -41,9 +64,9 @@ rule run_helixer:
     output:
         helixer=config['scratch'] + f"/{annotate_sample}/helixer/{annotate_sample}_helixer.gff"
     params:
-        lineage="land_plant",
+        lineage={lineage_op},
         species=config['species'],
-        model_path="/tsl/data/helixer/models/land_plant/land_plant_v0.3_m_0100.h5",
+        model_path={model},
         subsequence_length=64152,
         additional_options=config.get('helixer_options', ''),
         mem="32G",
@@ -117,20 +140,16 @@ checkpoint interpro:
 # Rule to run interpro on split files and aggregate results
 rule run_interpro:
     input:
-        fa=config["scratch"] + "/{sample}/ipro_fa/"
+        fa=config["scratch"] + "/{sample}/ipro_fa/{n}.fa"
     output:
-        gff=config["scratch"] + "/{sample}/ipro_gff/",
-        result="{sample}/results/interpro_result.gff"
+        gff=config["scratch"] + "/{sample}/ipro_gff/{n}.gff"
     params:
-        mem="32G",
+        mem="16G",
         queue="tsl-short",
         tmp=config["scratch"] + "/{sample}/ipro_tmp"
     threads: 16
     run:
-        ipro_files = glob_wildcards(os.path.join(input.fa, "{n}.fa")).n
-        for n in ipro_files:
-            shell(f"bash scripts/interpro.sh {input.fa}/{n}.fa {params.tmp} {threads} {output.gff}/{n}.gff")
-        shell(f"cat {output.gff}/*.gff > {output.result}")
+        shell(f"bash scripts/interpro.sh {input} {params.tmp} {threads} {output}")
 
 # Rule to run FIMO
 rule run_fimo:
@@ -182,6 +201,23 @@ rule run_nlrtracker:
         for sample in SAMPLES:
             fasta_path = sample_to_fa(sample, FASTAS, SAMPLES)
             shell(f"bash scripts/run_tracker.sh lib/interproscan_v5.69-101.0_entry.list {input.interpro} {input.fimo} {{fasta_path}} {sample}/nlrtracker_out {sample} p {input.hmmer} lib/iTOL_NLR_template.txt")
+
+
+def aggregate_ipro(wildcards):
+    checkpoint_output = checkpoints.interpro.get(**wildcards).output[0]
+    return expand(config['scratch'] + "/{sample}/ipro_gff/{n}.gff", sample=wildcards.sample, n=glob_wildcards(os.path.join(checkpoint_output, "{n}.fa")).n)
+
+rule aggregate:
+    input:
+        aggregate_ipro
+    output:
+        "{sample}/results/interpro_result.gff"
+    params:
+        mem="8G",
+        queue="tsl-short",
+    threads: 1
+    shell:
+        "cat {input} > {output}"
 
 # Rule to finalize the pipeline
 rule finalize:
