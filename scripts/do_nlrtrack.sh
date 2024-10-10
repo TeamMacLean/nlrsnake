@@ -17,16 +17,13 @@ Requires a file 'config.yaml' with three entries, e.g
  scratch: "/tsl/scratch/user_name/nlrsnake/"
  sample_fasta_file: "/hpc-home/user_name/samples_to_fasta.csv"
  seqs_per_file: 6000
- annotate: "Chr1_TAIR10,/hpc-home/user_name/Chr1_TAIR10.fasta"
  species: "Arabidopsis_thaliana"
  helixer_options: "--subsequence-length 35000 --lineage fungi"
- NEED TO ADD INPUT FOR UNANNOTATED FASTA
 
 
   * 'scratch' is the path of a temporary working directory for all steps of the pipeline. A subdirectory for each sample will be created.
   * 'sample_fasta_file' is the name of a csv file linking input sequences to sample names
-  * 'seqs_per_file' is the number of sequences per chunk for `interproscan` 6000 is a good number
-  * 'annotate' is the path to the fasta file you wish to use for annotation.
+  * 'seqs_per_file' is the number of sequences per chunk for `interproscan` 6000 is a good number.
   * 'species' is the species of the organism whos genome is to be annotated.  Should have an underscore (_) between genus and species names.
   * 'helixer_options' provides the opportunity to add additional usage options beyond the minimum.  Note default lineage is "land_plant"
 
