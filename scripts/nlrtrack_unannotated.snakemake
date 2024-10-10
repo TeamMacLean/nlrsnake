@@ -1,13 +1,7 @@
-# Improved Snakefile for NLRtracker pipeline
 import os
 from snakemake.io import glob_wildcards
 
 configfile: "config.yaml"
-
-# Parse annotation information
-annotate = config['annotate'].split(",")
-annotate_sample = annotate[0]
-annotate_path = annotate[1]
 
 # Define the final output
 FINAL_OUTPUT = "done.txt"
@@ -28,7 +22,7 @@ def get_fa_samples(file):
 def sample_to_fa(sample, fastas, samples):
     return fastas[samples.index(sample)]
 
-SAMPLES = annotate_sample
+FASTAS, SAMPLES = get_fa_samples(config['sample_fasta_file'])
 
 # Main rule to ensure correct order of execution
 rule all:
@@ -37,9 +31,9 @@ rule all:
 # Rule to run Helixer
 rule run_helixer:
     input:
-        fasta=f"{annotate_path}"
+        fasta=lambda wildcards: sample_to_fa(wildcards.sample, FASTAS, SAMPLES)
     output:
-        helixer=config['scratch'] + f"/{annotate_sample}/helixer/{annotate_sample}_helixer.gff"
+        helixer=config['scratch'] + "/{sample}/helixer/{sample}_helixer.gff"
     params:
         lineage="land_plant",
         species=config['species'],
@@ -58,10 +52,10 @@ rule run_helixer:
 # Rule to run gffread
 rule run_gffread:
     input:
-        fasta=f"{annotate_path}",
-        helixer=config['scratch'] + f"/{annotate_sample}/helixer/{annotate_sample}_helixer.gff"
+        fasta=lambda wildcards: sample_to_fa(wildcards.sample, FASTAS, SAMPLES),
+        helixer=config['scratch'] + "/{sample}/helixer/{sample}_helixer.gff"
     output:
-        gffread=config['scratch'] + f"/{annotate_sample}/gffread/{annotate_sample}_gffread.fasta"
+        gffread=config['scratch'] + "/{sample}/gffread/{sample}_gffread.fasta"
     params:
         mem="32G",
         queue="tsl-short"
@@ -71,42 +65,46 @@ rule run_gffread:
         bash scripts/gffread.sh {input.fasta} {output.gffread} {input.helixer}
         """
 
-# Rule to create new samples file
-rule create_new_samples:
+# Rule to update samples file
+rule update_samples:
     input:
-       gffread=config['scratch'] + f"/{annotate_sample}/gffread/{annotate_sample}_gffread.fasta"
+       gffread=expand(config['scratch'] + "/{sample}/gffread/{sample}_gffread.fasta", sample=SAMPLES[0])
     output:
-        new_samples=config['scratch'] + "/new_samples.csv"
+        update_samples=config['scratch'] + "/update_done.txt"
     params:
         mem="32G",
         queue="tsl-short"
     threads: 16
-    shell:
-        """
-        echo {annotate_sample},$(readlink -f {input.gffread}) > {output.new_samples}
-        """
+    run:
+        sample=SAMPLES[0]
+        with open(config['scratch'] + "/samples_to_fasta.csv", 'r+') as out_file:
+            sample_lines = out_file.readlines()
+            for i_sample, sample_line in enumerate(sample_lines):
+                if sample_line.startswith(sample):
+                    sample_lines[i_sample] = sample_lines[i_sample].replace(sample_lines[i_sample].split(',')[1], f"{os.path.realpath(config['scratch'] + f'/{sample}/gffread/{sample}_gffread.fasta')}\n")
+            out_file.seek(0)
+            for sample_line in sample_lines:
+                out_file.write(sample_line)
+        shell("touch {output.update_samples}")
 
 # Rule to strip asterisks
 rule strip_asterisks:
     input:
-        samples_file=rules.create_new_samples.output.new_samples
+        fasta=config['scratch'] + "/{sample}/gffread/{sample}_gffread.fasta"
     output:
         no_asterisk=config['scratch'] + "/{sample}/no_asterisk.fa"
     params:
         mem="4G",
         queue="tsl-short"
-    run:
-        FASTAS, SAMPLES = get_fa_samples(input.samples_file)
-        for sample in SAMPLES:
-            fasta_path = sample_to_fa(sample, FASTAS, SAMPLES)
-            shell(f"cat {{fasta_path}} | sed 's/*//g' > {{output.no_asterisk}}")
+    shell:
+        "cat {input.fasta} | sed 's/*//g' > {output.no_asterisk}"
 
 # Checkpoint for interpro
 checkpoint interpro:
     input:
-        config["scratch"] + "/{sample}/no_asterisk.fa"
+        config['scratch'] + "/{sample}/no_asterisk.fa"
     output:
-        fa=directory(config["scratch"] + "/{sample}/ipro_fa/")
+        fa=directory(config['scratch'] + "/{sample}/ipro_fa/")
     params:
         mem="4G",
         queue="tsl-short",
@@ -114,71 +112,47 @@ checkpoint interpro:
     threads: 1
     shell: "bash scripts/split_fa.sh {input} {params.seqs_per_file} {output}"
 
-# Rule to run interpro on split files and aggregate results
+# Rule to run interpro on split files
 rule run_interpro:
     input:
-        fa=config["scratch"] + "/{sample}/ipro_fa/{n}.fa"
+        fa=config['scratch'] + "/{sample}/ipro_fa/{n}.fa"
     output:
-        gff=config["scratch"] + "/{sample}/ipro_gff/{n}.gff"
+        gff=config['scratch'] + "/{sample}/ipro_gff/{n}.gff"
     params:
         mem="16G",
         queue="tsl-short",
-        tmp=config["scratch"] + "/{sample}/ipro_tmp"
+        tmp=config['scratch'] + "/{sample}/ipro_tmp"
     threads: 16
-    run:
-        shell(f"bash scripts/interpro.sh {input} {params.tmp} {threads} {output}")
+    shell:
+        "bash scripts/interpro.sh {input.fa} {params.tmp} {threads} {output.gff}"
 
 # Rule to run FIMO
 rule run_fimo:
     input:
-        samples_file=rules.create_new_samples.output.new_samples
+        fasta=lambda wildcards: sample_to_fa(wildcards.sample, FASTAS, SAMPLES),
+        update_samples=rules.update_samples.output.update_samples
     output:
         fimo="{sample}/results/fimo_out/fimo.gff"
     params:
         mem="32G",
         queue="tsl-short"
     threads: 16
-    run:
-        FASTAS, SAMPLES = get_fa_samples(input.samples_file)
-        for sample in SAMPLES:
-            fasta_path = sample_to_fa(sample, FASTAS, SAMPLES)
-            shell(f"bash scripts/fimo.sh {sample}/results/fimo_out lib/meme.xml {{fasta_path}}")
+    shell:
+    	"bash scripts/fimo.sh {wildcards.sample}/results/fimo_out lib/meme.xml {input.fasta}"
 
 # Rule to run HMMER
 rule run_hmmer:
     input:
-        samples_file=rules.create_new_samples.output.new_samples
+        fasta=lambda wildcards: sample_to_fa(wildcards.sample, FASTAS, SAMPLES),
+        update_samples=rules.update_samples.output.update_samples
     output:
         hmmer="{sample}/results/CJID.txt"
     params:
         mem="32G",
         queue="tsl-short"
     threads: 16
-    run:
-        FASTAS, SAMPLES = get_fa_samples(input.samples_file)
-        for sample in SAMPLES:
-            fasta_path = sample_to_fa(sample, FASTAS, SAMPLES)
-            shell(f"bash scripts/hmmer.sh {{output.hmmer}} lib/abe3069_Data_S1.hmm {{fasta_path}}")
-
-# Rule to run NLRtracker
-rule run_nlrtracker:
-    input:
-        interpro="{sample}/results/interpro_result.gff",
-        fimo="{sample}/results/fimo_out/fimo.gff",
-        hmmer="{sample}/results/CJID.txt",
-        samples_file=rules.create_new_samples.output.new_samples
-    output:
-        nlrtracker="{sample}/nlrtracker_out/done.txt"
-    params:
-        mem="32G",
-        queue="tsl-short"
-    threads: 16
-    run:
-        FASTAS, SAMPLES = get_fa_samples(input.samples_file)
-        for sample in SAMPLES:
-            fasta_path = sample_to_fa(sample, FASTAS, SAMPLES)
-            shell(f"bash scripts/run_tracker.sh lib/interproscan_v5.69-101.0_entry.list {input.interpro} {input.fimo} {{fasta_path}} {sample}/nlrtracker_out {sample} p {input.hmmer} lib/iTOL_NLR_template.txt")
-
+    shell:
+        "bash scripts/hmmer.sh {output.hmmer} lib/abe3069_Data_S1.hmm {input.fasta}"
 
 def aggregate_ipro(wildcards):
     checkpoint_output = checkpoints.interpro.get(**wildcards).output[0]
@@ -196,6 +170,25 @@ rule aggregate:
     shell:
         "cat {input} > {output}"
 
+# Rule to run NLRtracker
+rule run_nlrtracker:
+    input:
+        interpro="{sample}/results/interpro_result.gff",
+        fimo="{sample}/results/fimo_out/fimo.gff",
+        hmmer="{sample}/results/CJID.txt",
+        fasta=lambda wildcards: sample_to_fa(wildcards.sample, FASTAS, SAMPLES)
+    output:
+        nlrtracker="{sample}/nlrtracker_out/done.txt"
+    params:
+        mem="32G",
+        queue="tsl-short"
+    threads: 16
+    shell:
+        """
+        bash scripts/run_tracker.sh lib/interproscan_v5.69-101.0_entry.list {input.interpro} {input.fimo} \
+        {input.fasta} {wildcards.sample}/nlrtracker_out {wildcards.sample} p {input.hmmer} lib/iTOL_NLR_template.txt
+        """
+
 # Rule to finalize the pipeline
 rule finalize:
     input:
@@ -207,4 +200,4 @@ rule finalize:
         queue="tsl-short"
     threads: 1
     shell:
-        "cat {input} > {output}"
+        "echo 'Pipeline completed successfully' > {output}"
