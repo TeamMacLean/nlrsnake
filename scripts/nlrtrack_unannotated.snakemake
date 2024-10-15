@@ -68,23 +68,28 @@ rule run_gffread:
 # Rule to update samples file
 rule update_samples:
     input:
-       gffread=expand(config['scratch'] + "/{sample}/gffread/{sample}_gffread.fasta", sample=SAMPLES[0])
+       fasta=lambda wildcards: sample_to_fa(wildcards.sample, FASTAS, SAMPLES),
+       gffread=config['scratch'] + "/{sample}/gffread/{sample}_gffread.fasta"
     output:
-        update_samples=config['scratch'] + "/update_done.txt"
+        update_samples=config['scratch'] + "/{sample}/{sample}_update_done.txt"
     params:
-        mem="32G",
+        mem="4G",
         queue="tsl-short"
-    threads: 16
+    threads: 4
     run:
-        sample=SAMPLES[0]
-        with open(config['scratch'] + "/samples_to_fasta.csv", 'r+') as out_file:
-            sample_lines = out_file.readlines()
-            for i_sample, sample_line in enumerate(sample_lines):
-                if sample_line.startswith(sample):
-                    sample_lines[i_sample] = sample_lines[i_sample].replace(sample_lines[i_sample].split(',')[1], f"{os.path.realpath(config['scratch'] + f'/{sample}/gffread/{sample}_gffread.fasta')}\n")
-            out_file.seek(0)
-            for sample_line in sample_lines:
-                out_file.write(sample_line)
+        samples_file = config['scratch'] + "/samples_to_fasta.csv"
+        with open(samples_file, 'r') as in_file:
+            sample_lines = in_file.readlines()
+        
+        updated_lines = []
+        for line in sample_lines:
+            sample, old_path = line.strip().split(',')
+            new_path = os.path.realpath(config['scratch'] + f"/{sample}/gffread/{sample}_gffread.fasta")
+            updated_lines.append(f"{sample},{new_path}\n")
+        
+        with open(samples_file, 'w') as out_file:
+            out_file.writelines(updated_lines)
+        
         shell("touch {output.update_samples}")
 
 # Rule to strip asterisks
@@ -130,7 +135,7 @@ rule run_interpro:
 rule run_fimo:
     input:
         fasta=lambda wildcards: sample_to_fa(wildcards.sample, FASTAS, SAMPLES),
-        update_samples=rules.update_samples.output.update_samples
+        update_samples=config['scratch'] + "/{sample}/{sample}_update_done.txt"
     output:
         fimo="{sample}/results/fimo_out/fimo.gff"
     params:
@@ -144,7 +149,7 @@ rule run_fimo:
 rule run_hmmer:
     input:
         fasta=lambda wildcards: sample_to_fa(wildcards.sample, FASTAS, SAMPLES),
-        update_samples=rules.update_samples.output.update_samples
+        update_samples=config['scratch'] + "/{sample}/{sample}_update_done.txt"
     output:
         hmmer="{sample}/results/CJID.txt"
     params:
