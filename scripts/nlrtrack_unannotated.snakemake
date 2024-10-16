@@ -1,4 +1,5 @@
 import os
+import csv
 from snakemake.io import glob_wildcards
 
 configfile: "config.yaml"
@@ -78,19 +79,22 @@ rule update_samples:
     threads: 4
     run:
         samples_file = config['scratch'] + "/samples_to_fasta.csv"
-        with open(samples_file, 'r') as in_file:
-            sample_lines = in_file.readlines()
-        
-        updated_lines = []
-        for line in sample_lines:
-            sample, old_path = line.strip().split(',')
-            new_path = os.path.realpath(config['scratch'] + f"/{sample}/gffread/{sample}_gffread.fasta")
-            updated_lines.append(f"{sample},{new_path}\n")
-        
-        with open(samples_file, 'w') as out_file:
-            out_file.writelines(updated_lines)
-        
+        temp_file = config['scratch'] + "/temp_samples_to_fasta.csv"
+
+        with open(samples_file, 'r') as in_file, open(temp_file, 'w', newline='') as out_file:
+            reader = csv.reader(in_file)
+            writer = csv.writer(out_file)
+
+            for row in reader:
+                if row[0] == wildcards.sample:
+                    new_path = os.path.realpath(config['scratch'] + f'/{wildcards.sample}/gffread/{wildcards.sample}_gffread.fasta')
+                    writer.writerow([row[0], new_path])
+                else:
+                    writer.writerow(row)
+
+        os.replace(temp_file, samples_file)
         shell("touch {output.update_samples}")
+
 
 # Rule to strip asterisks
 rule strip_asterisks:
