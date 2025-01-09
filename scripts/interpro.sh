@@ -13,7 +13,7 @@ threads=$(($3 - 2))
 out=$4
 
 
-interproscan-5.71-102.0.sh -i $fasta \
+interproscan-5.72-103.0.sh -i $fasta \
   -f gff3 \
   -T $tmpdir \
   -cpu $threads \
