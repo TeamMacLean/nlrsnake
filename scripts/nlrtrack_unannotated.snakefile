@@ -42,7 +42,7 @@ rule run_helixer:
         subsequence_length=64152,
         additional_options=config.get('helixer_options', ''),
         mem="32G",
-        queue="tsl-short"
+        queue="tsl-medium"
     threads: 16
     shell:
         """
@@ -59,12 +59,32 @@ rule run_gffread:
         gffread=config['scratch'] + "/{sample}/gffread/{sample}_gffread.fasta"
     params:
         mem="32G",
-        queue="tsl-short"
+        queue="tsl-short",
+        temp_dir=config['scratch'] + "/{sample}/gffread"
     threads: 16
-    shell:
-        """
-        bash scripts/gffread.sh {input.fasta} {output.gffread} {input.helixer}
-        """
+    run:
+        import os
+        
+        # Create temp directory if it doesn't exist
+        shell("mkdir -p {params.temp_dir}")
+        
+        # Determine if the input fasta is compressed
+        is_compressed = input.fasta.endswith('.gz')
+        
+        # Create a temporary uncompressed file
+        temp_fasta = f"{params.temp_dir}/temp.fasta"
+        
+        # Uncompress or copy the file based on compression status
+        if is_compressed:
+            shell("gunzip -c {input.fasta} > {temp_fasta}")
+        else:
+            shell("cp {input.fasta} {temp_fasta}")
+        
+        # Run gffread
+        shell("bash scripts/gffread.sh {temp_fasta} {output.gffread} {input.helixer}")
+        
+        # Remove temporary file
+        shell("rm {temp_fasta}")
 
 # Rule to update samples file
 rule update_samples:
