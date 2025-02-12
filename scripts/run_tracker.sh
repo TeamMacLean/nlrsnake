@@ -1,5 +1,4 @@
-
-#source nlrtracker-1.0.0
+source nlrtracker-1.0.0
 mkdir -p $5
 Rscript scripts/NLRtracker.R \
   $1 \
