@@ -68,7 +68,7 @@ rule run_gffread:
     params:
         mem="32G",
         queue="tsl-short",
-        temp_dir=config['scratch'] + "/{sample}/gffread"
+        temp_dir=config['scratch'] + "/{sample}/gffread/"
     threads: 16
     run:
         # Use python to create temp directory
@@ -78,12 +78,12 @@ rule run_gffread:
         temp_fasta = os.path.join(params.temp_dir, "temp.fasta")
         
         # Check if input fasta is compressed without using python and without wildcards
-		# Improves compatability across environments
-        if "f{input.fasta}.endswith(".gz"):
-			with gzip.open(input.fasta, 'rb') as fasta_in, open(temp_fasta, 'wb') as fasta_out:
-				shutil.copyfileobj(fasta_in, fasta_out)
-		else:
-			shutil.copy(input.fasta, temp_fasta)
+        # Improves compatability across environments
+        if input.fasta.endswith(".gz"):
+            with gzip.open(input.fasta, 'rb') as fasta_in, open(temp_fasta, 'wb') as fasta_out:
+                shutil.copyfileobj(fasta_in, fasta_out)
+        else:
+            shutil.copy(input.fasta, temp_fasta)
         
         # Run gffread
         shell("bash scripts/gffread.sh {temp_fasta} {output.gffread} {input.helixer}")
@@ -109,14 +109,17 @@ checkpoint interpro:
         config['scratch'] + "/{sample}/no_asterisk.fa"
     output:
         fa=directory(config['scratch'] + "/{sample}/ipro_fa/")
-        # Add hidden file for tracking if pipeline needs to be started again
-        done=touch(config['scratch'] + "/{sample}/ipro_fa/.done")
     params:
         mem="4G",
         queue="tsl-short",
-        seqs_per_file=config['seqs_per_file']
+        seqs_per_file=config['seqs_per_file'],
+        hidden_done=config['scratch'] + "/{sample}/ipro_fa"
     threads: 1
-    shell: "bash scripts/split_fa.sh {input} {params.seqs_per_file} {output}"
+    shell: 
+        """bash scripts/split_fa.sh {input} {params.seqs_per_file} {output}
+        # Add hidden file for tracking if pipeline needs to be started again
+        echo done > {params.hidden_done}/.done
+        """
 
 # Rule to run interpro on split files
 rule run_interpro:
@@ -136,16 +139,19 @@ rule run_interpro:
 rule run_fimo:
     input:
         # Pass gffread output fasta directly
-        fasta=config['scratch'] + "/{sample}/gffread/{sample}_gffread.fasta
+        fasta=config['scratch'] + "/{sample}/gffread/{sample}_gffread.fasta"
     output:
         fimo="{sample}/results/fimo_out/fimo.gff"
-        fimo_dir=directory("{sample}/results/fimo_out")
     params:
         mem="32G",
-        queue="tsl-short"
+        queue="tsl-short",
+        fimo_dir="{sample}/results/fimo_out"
     threads: 16
-    shell:
-    	"bash scripts/fimo.sh {output.fimo_dir} lib/meme.xml {input.fasta}"
+    run:
+        # Use python to create fimo output directory
+        os.makedirs(params.fimo_dir, exist_ok=True)
+
+        shell("bash scripts/fimo.sh {params.fimo_dir} lib/meme.xml {input.fasta}")
 
 # Rule to run HMMER
 rule run_hmmer:
@@ -161,7 +167,7 @@ rule run_hmmer:
     shell:
         "bash scripts/hmmer.sh {output.hmmer} lib/abe3069_Data_S1.hmm {input.fasta}"
 
-# Update to ensure ensure files within checkpoint_output are tracked
+# Update to ensure files within checkpoint_output are tracked
 def aggregate_ipro(wildcards):
     checkpoint_output = checkpoints.interpro.get(**wildcards).output[0]
 
@@ -199,24 +205,27 @@ rule run_nlrtracker:
         hmmer="{sample}/results/CJID.txt",
         fasta=config['scratch'] + "/{sample}/gffread/{sample}_gffread.fasta"
     output:
-        nlrtracker="{sample}/nlrtracker_out/done.txt"
-        nlrtracker_dir=directory("{sample}/nlrtracker_out")
+        done="{sample}/results/done.txt"
     params:
         mem="32G",
-        queue="tsl-short"
-        sample_name="{sample}"
+        queue="tsl-short",
+        sample_name="{sample}",
+        nlrtracker_dir="{sample}/nlrtracker_out"
     threads: 16
-    shell:
-        """
+    run:
+        # Use python to create nlrtracker output directory
+        os.makedirs(params.nlrtracker_dir, exist_ok=True)
+
+        shell("""
         bash scripts/run_tracker.sh lib/interproscan_v5.71-102.0_entry.list {input.interpro} {input.fimo} \
-        {input.fasta} {output.nlrtracker_dir} {params.sample_name} p {input.hmmer} lib/iTOL_NLR_template.txt
-        """
+        {input.fasta} {params.nlrtracker_dir} {params.sample_name} p {input.hmmer} lib/iTOL_NLR_template.txt
+        echo "done" > {output.done}
+        """)
 
 # Rule to finalize the pipeline
 rule finalize:
     input:
-        # Changed to delay expansion
-        lambda wildcards: expand("{sample}/nlrtracker_out/done.txt", sample=SAMPLES)
+        expand("{sample}/results/done.txt", sample=SAMPLES)
     output:
         touch(FINAL_OUTPUT)
     params:
