@@ -35,7 +35,7 @@ if [ -z "$1" ]
 then
    sbatch -J nlrtrack \
     -o nlrtrack.log \
-    --wrap="source snakemake-5.5.3; snakemake -s scripts/nlrtrack_unannotated.snakefile all --cluster 'sbatch --partition={params.queue} -c {threads} --mem={params.mem} ' -j 40 --max-jobs-per-second 5 --max-status-checks-per-second 5 --latency-wait 60" \
+    --wrap="source snakemake-5.5.3; snakemake -s scripts/nlrtrack_unannotated.snakefile all --cluster 'sbatch --partition={params.queue} -c {threads} --mem={params.mem} ' -j 40 --max-jobs-per-second 5 --max-status-checks-per-second 5 --latency-wait 120 --keep-going --rerun-incomplete" \
     --partition="tsl-long" \
     --mem="4G"
 elif [ $1 = 'unlock' ]
@@ -52,11 +52,21 @@ then
     --wrap="source snakemake-5.5.3; snakemake -s scripts/nlrtrack_unannotated.snakefile -n" \
     --partition="tsl-short" \
     --mem="16G"
+elif [ $1 = "debug" ]
+then
+    sbatch -J debug \
+    -o nlrtrack.log \
+    # Edit below as required to debug
+    --wrap="source snakemake-5.5.3; snakemake -s scripts/nlrtrack_unannotated.snakefile -n -p add_rule_to_debug" \
+    --partition="tsl-short" \
+    --mem="16G"
 elif [ $1 = "dag" ]
 then
+    source package graphviz-2.38.0
     sbatch -J dag \
     -o nlrtrack.log \
-    --wrap="source snakemake-5.5.3; snakemake --dag -s scripts/nlrtrack_unannotated.snakefile  > nlrtrack.dot" \
+    # Edit to have the command make a dag image directly
+    --wrap="source snakemake-5.5.3; snakemake --dag -s scripts/nlrtrack_unannotated.snakefile | dot -Tsvg > nlrtrack.svg" \
     --partition="tsl-short" \
     --mem="16G"
 elif [ $1 = '-h' ]
