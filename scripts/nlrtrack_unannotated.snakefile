@@ -77,7 +77,7 @@ rule run_gffread:
         # Create a temporary uncompressed file
         temp_fasta = os.path.join(params.temp_dir, "temp.fasta")
         
-        # Check if input fasta is compressed without using python and without wildcards
+        # Check if input fasta is compressed using python and without wildcards
         # Improves compatability across environments
         if input.fasta.endswith(".gz"):
             with gzip.open(input.fasta, 'rb') as fasta_in, open(temp_fasta, 'wb') as fasta_out:
