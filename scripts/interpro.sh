@@ -5,15 +5,13 @@
 #source interproscan-5.45
 source nlrtracker-1.0.0
 
-
-dir=`pwd`
 fasta=$1
 tmpdir=$2
 threads=$(($3 - 2))
 out=$4
 
 
-interproscan-5.72-103.0.sh -i $fasta \
+interproscan.sh -i $fasta \
   -f gff3 \
   -T $tmpdir \
   -cpu $threads \
