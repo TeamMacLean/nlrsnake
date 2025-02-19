@@ -17,4 +17,5 @@ interproscan.sh -i $fasta \
   -T $tmpdir \
   -cpu $threads \
   -o $out \
-  -appl Pfam,Gene3D,SUPERFAMILY,PRINTS,SMART,CDD,ProSiteProfiles
+  -appl Pfam,Gene3D,SUPERFAMILY,PRINTS,SMART,CDD,ProSiteProfiles \
+  -dp
